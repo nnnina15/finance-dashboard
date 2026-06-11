@@ -611,15 +611,13 @@
 
   <!-- ═══ 總覽 ═══ -->
   <div class="page active" id="page-dashboard">
-    <div style="margin-bottom:6px;">
-      <div style="font-size:13px;color:var(--text-muted);margin-bottom:4px;">歡迎回來 👋</div>
-      <div class="page-title" style="margin:0 0 4px;">財務總覽</div>
+    <div style="margin-bottom:6px;text-align:center;">
+<div class="page-title" style="margin:0 0 4px;">財務總覽</div>
       <div id="dash-today" style="font-size:13px;color:var(--text-muted);margin-bottom:20px;"></div>
     </div>
 
     <!-- 資產快照 -->
-    <div style="margin-bottom:10px;font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:.8px;text-transform:uppercase;">▸ 我的資產</div>
-    <div class="grid-3" style="margin-bottom:24px;">
+<div class="grid-3" style="margin-bottom:24px;">
       <div class="card" style="border:1px solid rgba(93,223,184,.25);box-shadow:0 0 40px rgba(93,223,184,.12),0 8px 32px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.14);">
         <div class="card-title">💵 可用現金</div>
         <div class="card-value" id="dash-cash" style="color:var(--success)">$0</div>
@@ -666,7 +664,7 @@
     </div>
 
     <!-- 期間收支 label -->
-    <div style="font-size:12px;font-weight:700;color:var(--text-muted);letter-spacing:.5px;margin-bottom:12px;" id="dash-period-label">▸ 本月收支</div>
+    <div style="font-size:16px;font-weight:700;color:var(--text-muted);letter-spacing:.5px;margin-bottom:12px;text-align:center;" id="dash-period-label">本月收支</div>
     <div class="grid-4" style="margin-bottom:24px;">
       <div class="card">
         <div class="card-title" id="dash-income-title">收入</div>
@@ -1530,7 +1528,7 @@ function renderDashboard() {
 
   // 期間收支
   const {start,end,label,prefix}=getDashRange();
-  document.getElementById('dash-period-label').textContent='▸ '+label+' 收支';
+  document.getElementById('dash-period-label').textContent=label+' 收支';
   document.getElementById('dash-income-title').textContent=prefix+'收入';
   document.getElementById('dash-expense-title').textContent=prefix+'支出';
   document.getElementById('dash-balance-title').textContent=prefix+'結餘';
@@ -2069,30 +2067,39 @@ function renderCalendar() {
   if (!titleEl||!gridEl) return;
 
   if (dashPeriod==='year') {
-    /* ── 年視圖：12個月摘要格 ── */
+    /* ── 年視圖：12個月摘要格（4欄×3列）── */
     if(weekdayRow) weekdayRow.style.display='none';
+    /* 覆蓋 cal-grid 的 7欄樣式 */
+    gridEl.style.gridTemplateColumns='repeat(4,1fr)';
+    gridEl.style.gap='8px';
     titleEl.textContent=`${calYear}年`;
     const allTx=getTransactions().filter(t=>new Date(t.date).getFullYear()===calYear);
     const now=new Date(); const curM=now.getFullYear()===calYear?now.getMonth():-1;
     const MNAMES=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
-    let html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">';
+    const fmt=n=>n>=10000?Math.round(n/1000)+'k':n>=1000?(n/1000).toFixed(1).replace(/\.0$/,'')+'k':String(n);
+    let html='';
     for(let m=0;m<12;m++){
       const txs=allTx.filter(t=>new Date(t.date).getMonth()===m);
       const inc=txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
       const exp=txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+      const net=inc-exp;
       const isCur=m===curM;
-      html+=`<div onclick="setCalYearMonth(${m})" style="border-radius:12px;padding:10px 8px;background:${isCur?'rgba(155,140,255,.22)':'rgba(255,255,255,.05)'};border:1px solid ${isCur?'var(--primary)':'rgba(255,255,255,.08)'};cursor:pointer;transition:all .18s;">
-        <div style="font-size:12px;font-weight:700;margin-bottom:6px;color:${isCur?'var(--primary)':'var(--text)'};">${MNAMES[m]}</div>
-        ${inc?`<div style="font-size:11px;color:var(--success);">+$${inc.toLocaleString()}</div>`:''}
-        ${exp?`<div style="font-size:11px;color:var(--danger);">-$${exp.toLocaleString()}</div>`:''}
-        ${!inc&&!exp?`<div style="font-size:11px;color:var(--text-muted);">–</div>`:''}
+      const hasTx=inc>0||exp>0;
+      html+=`<div onclick="setCalYearMonth(${m})" style="border-radius:12px;padding:10px 6px;background:${isCur?'rgba(155,140,255,.22)':'rgba(255,255,255,.05)'};border:1px solid ${isCur?'var(--primary)':'rgba(255,255,255,.08)'};cursor:pointer;transition:background .18s;text-align:center;">
+        <div style="font-size:13px;font-weight:800;margin-bottom:6px;color:${isCur?'var(--primary)':'var(--text)'};">${MNAMES[m]}</div>
+        ${exp?`<div style="font-size:11px;font-weight:700;color:var(--danger);">-$${fmt(exp)}</div>`:''}
+        ${inc?`<div style="font-size:11px;font-weight:700;color:var(--success);">+$${fmt(inc)}</div>`:''}
+        ${hasTx?`<div style="font-size:10px;color:${net>=0?'var(--success)':'var(--danger)'};margin-top:3px;opacity:.75;">${net>=0?'+':'-'}$${fmt(Math.abs(net))}</div>`:''}
+        ${!hasTx?`<div style="font-size:13px;color:var(--text-muted);">–</div>`:''}
       </div>`;
     }
-    html+='</div>';
     gridEl.innerHTML=html;
     const detEl=document.getElementById('cal-day-detail'); if(detEl) detEl.style.display='none';
     return;
   }
+  /* 其他模式還原 cal-grid 樣式 */
+  gridEl.style.gridTemplateColumns='';
+  gridEl.style.gap='';
 
   /* ── 月/週/日 共用月格視圖 ── */
   if(weekdayRow) weekdayRow.style.display='';
