@@ -181,6 +181,63 @@
       .grid-2 { grid-template-columns: 1fr; }
       .grid-3 { grid-template-columns: 1fr; }
     }
+
+    /* ── 手機版 ── */
+    @media (max-width: 600px) {
+      /* 側邊欄改成底部導覽列 */
+      .sidebar {
+        width: 100%; height: 60px; top: auto; bottom: 0; left: 0; right: 0;
+        flex-direction: row; border-right: none; border-top: 1px solid var(--border);
+        z-index: 200;
+      }
+      .logo { display: none; }
+      nav {
+        flex: 1; display: flex; flex-direction: row; padding: 0;
+        align-items: stretch; overflow-x: auto;
+      }
+      .nav-item {
+        flex: 1; flex-direction: column; gap: 2px; padding: 6px 4px;
+        font-size: 10px; justify-content: center; align-items: center;
+        border-radius: 0; margin: 0; min-width: 50px;
+      }
+      .nav-item svg { width: 20px; height: 20px; }
+      .nav-label { display: block !important; font-size: 10px; }
+      .sidebar-footer { display: none; }
+      #user-chip-area { display: none; }
+
+      /* 主內容往上移，留底部空間 */
+      .main { margin-left: 0; padding: 16px 12px 80px; }
+
+      /* 格線全部單欄 */
+      .grid-4, .grid-2, .grid-3 { grid-template-columns: 1fr; }
+
+      /* 頁面標題縮小 */
+      .page-title { font-size: 18px; }
+
+      /* 表單欄位單欄 */
+      .form-row { grid-template-columns: 1fr; }
+      .form-row > div[style*="span 2"] { grid-column: span 1 !important; }
+
+      /* 表格捲動 */
+      .card { overflow-x: auto; }
+      table { min-width: 480px; }
+
+      /* 操作按鈕縮小 */
+      tbody td:last-child { display: flex; gap: 4px; flex-wrap: wrap; }
+
+      /* Auth 畫面 */
+      .auth-box { padding: 28px 20px; }
+
+      /* Dashboard 期間選擇器換行 */
+      #page-dashboard > div:first-child { flex-direction: column; align-items: flex-start; }
+
+      /* Modal */
+      .modal { padding: 20px 16px; }
+
+      /* tabs 捲動 */
+      .tabs { overflow-x: auto; flex-wrap: nowrap; }
+      .tab { white-space: nowrap; }
+    }
   </style>
 </head>
 <body>
@@ -209,6 +266,10 @@
     <div class="nav-item" onclick="showPage('goals',this)">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
       <span class="nav-label">儲蓄目標</span>
+    </div>
+    <div class="nav-item" onclick="showPage('assets',this)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 14l-3-3 1.41-1.41L11 12.17l4.59-4.58L17 9l-6 6z"/></svg>
+      <span class="nav-label">資產</span>
     </div>
     <div class="nav-item" onclick="showPage('charts',this)">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/></svg>
@@ -500,6 +561,78 @@
     <div class="empty" id="goal-empty">尚未設定任何儲蓄目標</div>
   </div>
 
+  <!-- ═══ 資產管理 ═══ -->
+  <div class="page" id="page-assets">
+    <div class="page-title">資產管理</div>
+
+    <!-- 總資產摘要 -->
+    <div class="grid-3" style="margin-bottom:24px;">
+      <div class="card">
+        <div class="card-title">💵 現金合計</div>
+        <div class="card-value" id="asset-cash-total" style="color:var(--success)">$0</div>
+        <div class="card-sub" id="asset-cash-count">共 0 項</div>
+      </div>
+      <div class="card">
+        <div class="card-title">📈 投資合計</div>
+        <div class="card-value" id="asset-invest-total" style="color:var(--primary)">$0</div>
+        <div class="card-sub" id="asset-invest-count">共 0 項</div>
+      </div>
+      <div class="card">
+        <div class="card-title">🏦 總資產</div>
+        <div class="card-value" id="asset-net-total">$0</div>
+        <div class="card-sub">現金 + 投資</div>
+      </div>
+    </div>
+
+    <!-- 新增資產 -->
+    <div class="card" style="margin-bottom:20px;">
+      <div class="section-header"><h2>新增 / 更新資產</h2></div>
+      <div class="form-row">
+        <div>
+          <label>類型</label>
+          <select id="asset-type" onchange="updateAssetCategory()">
+            <option value="cash">💵 現金</option>
+            <option value="invest">📈 投資</option>
+          </select>
+        </div>
+        <div>
+          <label>類別</label>
+          <select id="asset-category">
+            <option value="現金">現金</option>
+            <option value="銀行存款">銀行存款</option>
+            <option value="活存">活存</option>
+            <option value="定存">定存</option>
+          </select>
+        </div>
+        <div>
+          <label>名稱</label>
+          <input type="text" id="asset-name" placeholder="例：台新銀行、00878…" />
+        </div>
+        <div>
+          <label>金額 (NT$)</label>
+          <input type="number" id="asset-amount" placeholder="0" min="0" />
+        </div>
+        <div>
+          <label>備註（選填）</label>
+          <input type="text" id="asset-note" placeholder="例：薪轉帳戶" />
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="addAsset()">＋ 新增</button>
+    </div>
+
+    <!-- 現金列表 -->
+    <div class="card" style="margin-bottom:20px;">
+      <div class="section-header"><h2>💵 現金 &amp; 存款</h2></div>
+      <div id="asset-cash-list"><div class="empty">尚未新增現金項目</div></div>
+    </div>
+
+    <!-- 投資列表 -->
+    <div class="card">
+      <div class="section-header"><h2>📈 投資</h2></div>
+      <div id="asset-invest-list"><div class="empty">尚未新增投資項目</div></div>
+    </div>
+  </div>
+
   <!-- ═══ 圖表分析 ═══ -->
   <div class="page" id="page-charts">
     <div class="page-title">圖表分析</div>
@@ -672,6 +805,7 @@ function showPage(id, el) {
   if (id==='transactions') { renderTransactions(); if (document.getElementById('recur-panel').style.display!=='none') renderRecurring(); }
   if (id==='budget')       renderBudgets();
   if (id==='goals')        renderGoals();
+  if (id==='assets')       { updateAssetCategory(); renderAssets(); }
   if (id==='charts')       renderCharts();
 }
 
@@ -934,6 +1068,86 @@ function renderDashboard() {
       <div class="progress-bar"><div class="progress-fill ${fill}" style="width:${pct}%"></div></div>
     </div>`;
   }).join('');
+}
+
+/* ── 資產 ── */
+const ASSET_CATEGORIES = {
+  cash:   ['現金','銀行存款','活存','定存','電子支付'],
+  invest: ['台股','美股','ETF','基金','加密貨幣','債券','房地產','其他投資']
+};
+function getAssets() { return state.assets || []; }
+function updateAssetCategory() {
+  const type = document.getElementById('asset-type').value;
+  const sel  = document.getElementById('asset-category');
+  sel.innerHTML = ASSET_CATEGORIES[type].map(c=>`<option value="${c}">${c}</option>`).join('');
+}
+function addAsset() {
+  const type     = document.getElementById('asset-type').value;
+  const category = document.getElementById('asset-category').value;
+  const name     = document.getElementById('asset-name').value.trim();
+  const amount   = parseFloat(document.getElementById('asset-amount').value);
+  const note     = document.getElementById('asset-note').value.trim();
+  if (!name)          return alert('請輸入名稱');
+  if (!amount||amount<=0) return alert('請輸入有效金額');
+  if (!state.assets) state.assets = [];
+  // 若同名已存在則更新
+  const existing = state.assets.find(a=>a.name===name && a.type===type);
+  if (existing) { existing.amount=amount; existing.category=category; existing.note=note; }
+  else state.assets.push({ id:Date.now(), type, category, name, amount, note });
+  saveState(); renderAssets();
+  document.getElementById('asset-name').value='';
+  document.getElementById('asset-amount').value='';
+  document.getElementById('asset-note').value='';
+}
+function deleteAsset(id) {
+  state.assets = getAssets().filter(a=>a.id!==id);
+  saveState(); renderAssets();
+}
+function renderAssets() {
+  const assets  = getAssets();
+  const cash    = assets.filter(a=>a.type==='cash');
+  const invest  = assets.filter(a=>a.type==='invest');
+  const cashSum = cash.reduce((s,a)=>s+a.amount,0);
+  const invSum  = invest.reduce((s,a)=>s+a.amount,0);
+  const total   = cashSum + invSum;
+
+  document.getElementById('asset-cash-total').textContent  = '$'+cashSum.toLocaleString();
+  document.getElementById('asset-invest-total').textContent= '$'+invSum.toLocaleString();
+  document.getElementById('asset-net-total').textContent   = '$'+total.toLocaleString();
+  document.getElementById('asset-cash-count').textContent  = `共 ${cash.length} 項`;
+  document.getElementById('asset-invest-count').textContent= `共 ${invest.length} 項`;
+
+  const renderList = (items, containerId, emptyText) => {
+    const el = document.getElementById(containerId);
+    if (!items.length) { el.innerHTML=`<div class="empty">${emptyText}</div>`; return; }
+    const sum = items.reduce((s,a)=>s+a.amount,0);
+    el.innerHTML = `
+      <table>
+        <thead><tr><th>類別</th><th>名稱</th><th>備註</th><th>金額</th><th>佔比</th><th style="width:70px;"></th></tr></thead>
+        <tbody>
+          ${items.map(a=>{
+            const pct = sum ? Math.round(a.amount/sum*100) : 0;
+            return `<tr>
+              <td><span style="font-size:13px;color:var(--text-muted);">${a.category}</span></td>
+              <td style="font-weight:600;">${a.name}</td>
+              <td style="color:var(--text-muted);font-size:13px;">${a.note||'—'}</td>
+              <td style="font-weight:700;">$${a.amount.toLocaleString()}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <div style="width:60px;height:6px;background:var(--border);border-radius:99px;overflow:hidden;">
+                    <div style="width:${pct}%;height:100%;background:var(--primary);border-radius:99px;"></div>
+                  </div>
+                  <span style="font-size:12px;color:var(--text-muted);">${pct}%</span>
+                </div>
+              </td>
+              <td><button class="btn btn-danger" onclick="deleteAsset(${a.id})">刪除</button></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`;
+  };
+  renderList(cash,   'asset-cash-list',   '尚未新增現金項目');
+  renderList(invest, 'asset-invest-list', '尚未新增投資項目');
 }
 
 /* ── 圖表 ── */
