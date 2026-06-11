@@ -910,7 +910,7 @@
       <div class="form-row">
         <div>
           <label>類型</label>
-          <select id="asset-type" onchange="updateAssetCategory()">
+          <select id="asset-type" onchange="updateAssetCategory()" oninput="updateAssetCategory()">
             <option value="cash">💵 現金</option>
             <option value="invest">📈 投資</option>
           </select>
@@ -1197,6 +1197,7 @@ async function startApp(uid, isNew = false, displayName = '') {
   buildPayChips();
   populateCategorySelect();
   document.getElementById('tx-type').addEventListener('change', populateCategorySelect);
+  document.getElementById('asset-type').addEventListener('change', updateAssetCategory);
   updateRecurCategories();
   updateRecurDayUI();
 
@@ -1632,9 +1633,14 @@ const ASSET_CATEGORIES = {
 };
 function getAssets() { return state.assets || []; }
 function updateAssetCategory() {
-  const type = document.getElementById('asset-type').value;
-  const sel  = document.getElementById('asset-category');
-  sel.innerHTML = ASSET_CATEGORIES[type].map(c=>`<option value="${c}">${c}</option>`).join('');
+  const assetTypeEl = document.getElementById('asset-type');
+  const sel = document.getElementById('asset-category');
+  if (!assetTypeEl || !sel) return;
+  const type = assetTypeEl.value;
+  const opts = type === 'invest'
+    ? ['台股','美股','ETF','基金','加密貨幣','債券','房地產','其他投資']
+    : ['現金','銀行存款','活存','定存','電子支付'];
+  sel.innerHTML = opts.map(c=>`<option value="${c}">${c}</option>`).join('');
 }
 function addAsset() {
   const type     = document.getElementById('asset-type').value;
@@ -2181,19 +2187,17 @@ function setCalYearMonth(m) {
   renderCalendar(); renderDashboard();
 }
 function selectCalDay(d) {
-  /* 點擊日期 → 切到日模式並顯示詳情 */
+  /* 點擊日期 → 切到日模式並更新收支數據 */
   calSelectedDate={d,m:calMonth,y:calYear};
-  if(dashPeriod!=='day'){
-    dashPeriod='day';
-    const now=new Date(); const dt=new Date(calYear,calMonth,d);
-    dashOffset=Math.round((dt-new Date(now.getFullYear(),now.getMonth(),now.getDate()))/(86400000));
-    document.querySelectorAll('#dash-period-tabs .tab').forEach((t,i)=>{t.classList.remove('active'); if(i===0) t.classList.add('active');});
-    renderDashboard();
-  }
+  dashPeriod='day';
+  const now=new Date(); const dt=new Date(calYear,calMonth,d);
+  dashOffset=Math.round((dt-new Date(now.getFullYear(),now.getMonth(),now.getDate()))/(86400000));
+  document.querySelectorAll('#dash-period-tabs .tab').forEach((t,i)=>{t.classList.remove('active'); if(i===0) t.classList.add('active');});
   document.querySelectorAll('#cal-grid .cal-cell').forEach(el=>el.classList.remove('selected','week-highlight'));
   const cell=document.querySelector(`#cal-grid .cal-cell[data-day="${d}"]`);
   if(cell) cell.classList.add('selected');
   showCalDayDetail(d);
+  renderDashboard();
 }
 function showCalDayDetail(d) {
   const detail  = document.getElementById('cal-day-detail');
