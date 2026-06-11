@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>個人理財儀表板</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
@@ -177,6 +179,12 @@
     .modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:20px; }
     .btn-outline { background:none; border:1px solid var(--border); color:var(--text); padding:9px 18px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; }
     .btn-outline:hover { background:var(--bg); }
+
+    /* ── Loading ── */
+    .loading-overlay { position:fixed; inset:0; background:rgba(255,255,255,.9); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; font-size:14px; color:var(--text-muted); }
+    .loading-overlay.hidden { display:none; }
+    .spinner { width:36px; height:36px; border:3px solid var(--border); border-top-color:var(--primary); border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
 
     @media (max-width: 900px) {
       .sidebar { width: 60px; }
@@ -753,11 +761,35 @@ let dashPeriod = 'month';
 let dashOffset = 0;
 let pieChart, barChart, lineChart;
 
-/* ── 帳號 ── */
-function getUsers() { try { return JSON.parse(localStorage.getItem('mt_users')||'{}'); } catch { return {}; } }
-function saveUsers(u) { localStorage.setItem('mt_users', JSON.stringify(u)); }
-function loadState() { if (!currentUser) return {}; try { return JSON.parse(localStorage.getItem('mt_data_'+currentUser)||'{}'); } catch { return {}; } }
-function saveState() { if (!currentUser) return; localStorage.setItem('mt_data_'+currentUser, JSON.stringify(state)); }
+/* ── Firebase 初始化 ── */
+const firebaseConfig = {
+  apiKey: "AIzaSyA39rtweO8KyIa7HTZK6PkY-ubofT6bax8",
+  authDomain: "finance-dashboard-91038.firebaseapp.com",
+  projectId: "finance-dashboard-91038",
+  storageBucket: "finance-dashboard-91038.firebasestorage.app",
+  messagingSenderId: "634574740998",
+  appId: "1:634574740998:web:c4e44fc0cc43f6a3226d87"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+function showLoading(v) { document.getElementById('loading-overlay').classList.toggle('hidden', !v); }
+
+/* ── 帳號（Firestore）── */
+async function getUser(u) {
+  const doc = await db.collection('users').doc(u).get();
+  return doc.exists ? doc.data() : null;
+}
+async function saveUser(u, data) { await db.collection('users').doc(u).set(data); }
+async function loadState() {
+  if (!currentUser) return {};
+  const doc = await db.collection('userData').doc(currentUser).get();
+  return doc.exists ? doc.data() : {};
+}
+function saveState() {
+  if (!currentUser) return;
+  db.collection('userData').doc(currentUser).set(state).catch(console.error);
+}
 
 /* ── SHA-256 ── */
 async function hashPassword(pw) {
@@ -780,12 +812,16 @@ async function login() {
   const p = document.getElementById('login-pass').value;
   const e = document.getElementById('login-error');
   if (!u||!p) { e.textContent='請輸入帳號和密碼'; return; }
-  const users = getUsers();
-  if (!users[u]) { e.textContent='帳號不存在'; return; }
-  const h = await hashPassword(p);
-  if (users[u].hash !== h) { e.textContent='密碼錯誤'; return; }
-  sessionStorage.setItem('mt_user', u);
-  startApp(u);
+  showLoading(true);
+  try {
+    const user = await getUser(u);
+    if (!user) { e.textContent='帳號不存在'; return; }
+    const h = await hashPassword(p);
+    if (user.hash !== h) { e.textContent='密碼錯誤'; return; }
+    sessionStorage.setItem('mt_user', u);
+    await startApp(u);
+  } catch(err) { e.textContent='連線失敗，請稍後再試'; console.error(err); }
+  finally { showLoading(false); }
 }
 
 async function register() {
@@ -797,12 +833,15 @@ async function register() {
   if (!/^[a-zA-Z0-9_一-鿿]+$/.test(u)) { e.textContent='帳號只能使用英數字、底線或中文'; return; }
   if (p.length < 6) { e.textContent='密碼至少需要 6 個字元'; return; }
   if (p !== p2) { e.textContent='兩次密碼不一致'; return; }
-  const users = getUsers();
-  if (users[u]) { e.textContent='此帳號已被使用'; return; }
-  users[u] = { hash: await hashPassword(p) };
-  saveUsers(users);
-  sessionStorage.setItem('mt_user', u);
-  startApp(u, true);
+  showLoading(true);
+  try {
+    const existing = await getUser(u);
+    if (existing) { e.textContent='此帳號已被使用'; return; }
+    await saveUser(u, { hash: await hashPassword(p) });
+    sessionStorage.setItem('mt_user', u);
+    await startApp(u, true);
+  } catch(err) { e.textContent='連線失敗，請稍後再試'; console.error(err); }
+  finally { showLoading(false); }
 }
 
 function logout() {
@@ -817,9 +856,9 @@ function logout() {
   switchAuthTab('login');
 }
 
-function startApp(username, isNew = false) {
+async function startApp(username, isNew = false) {
   currentUser = username;
-  state       = loadState();
+  state       = await loadState();
 
   if (isNew && !state.transactions) {
     const t = new Date();
@@ -891,15 +930,19 @@ function showPage(id, el) {
 }
 
 /* ── 初始化 ── */
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   document.querySelector('.sidebar').style.display = 'none';
   document.querySelector('.main').style.display    = 'none';
   document.getElementById('auth-screen').classList.add('show');
   const saved = sessionStorage.getItem('mt_user');
   if (saved) {
-    const users = getUsers();
-    if (users[saved]) { startApp(saved); return; }
-    sessionStorage.removeItem('mt_user');
+    showLoading(true);
+    try {
+      const user = await getUser(saved);
+      if (user) { await startApp(saved); return; }
+      sessionStorage.removeItem('mt_user');
+    } catch(err) { console.error(err); }
+    finally { showLoading(false); }
   }
 });
 
@@ -1537,5 +1580,9 @@ function closeModal(e) {
     document.getElementById('edit-modal').classList.remove('open');
 }
 </script>
+<div class="loading-overlay hidden" id="loading-overlay">
+  <div class="spinner"></div>
+  <span>載入中…</span>
+</div>
 </body>
 </html>
