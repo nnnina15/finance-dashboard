@@ -351,11 +351,34 @@
 
   <!-- ═══ 總覽 ═══ -->
   <div class="page active" id="page-dashboard">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
-      <div>
-        <div style="font-size:13px;color:var(--text-muted);margin-bottom:4px;">歡迎回來 👋</div>
-        <div class="page-title" style="margin:0;" id="dash-period-label">財務總覽</div>
+    <div style="margin-bottom:6px;">
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:4px;">歡迎回來 👋</div>
+      <div class="page-title" style="margin:0 0 20px;">財務總覽</div>
+    </div>
+
+    <!-- 資產快照 -->
+    <div style="margin-bottom:8px;font-size:12px;font-weight:700;color:var(--text-muted);letter-spacing:.5px;">▸ 我的資產</div>
+    <div class="grid-3" style="margin-bottom:24px;">
+      <div class="card" style="border:2px solid var(--success);background:var(--success-light);">
+        <div class="card-title">💵 可用現金</div>
+        <div class="card-value" id="dash-cash" style="color:var(--success)">$0</div>
+        <div class="card-sub" id="dash-cash-sub">現金 + 存款</div>
       </div>
+      <div class="card">
+        <div class="card-title">📈 投資資產</div>
+        <div class="card-value" id="dash-invest" style="color:var(--primary)">$0</div>
+        <div class="card-sub" id="dash-invest-sub">股票 / ETF / 基金…</div>
+      </div>
+      <div class="card" style="border:2px solid var(--primary);background:var(--primary-light);">
+        <div class="card-title">🏦 總資產</div>
+        <div class="card-value" id="dash-net" style="color:var(--primary)">$0</div>
+        <div class="card-sub">現金 + 投資</div>
+      </div>
+    </div>
+
+    <!-- 期間收支 -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text-muted);letter-spacing:.5px;" id="dash-period-label">▸ 本月收支</div>
       <div style="display:flex;align-items:center;gap:10px;">
         <div class="tabs" style="margin:0;" id="dash-period-tabs">
           <div class="tab" onclick="setDashPeriod('day',this)">日</div>
@@ -369,19 +392,19 @@
         </div>
       </div>
     </div>
-    <div class="grid-4">
+    <div class="grid-4" style="margin-bottom:24px;">
       <div class="card">
-        <div class="card-title" id="dash-income-title">本月收入</div>
+        <div class="card-title" id="dash-income-title">收入</div>
         <div class="card-value" id="dash-income" style="color:var(--success)">$0</div>
         <div class="card-sub" id="dash-income-count">共 0 筆</div>
       </div>
       <div class="card">
-        <div class="card-title" id="dash-expense-title">本月支出</div>
+        <div class="card-title" id="dash-expense-title">支出</div>
         <div class="card-value" id="dash-expense" style="color:var(--danger)">$0</div>
         <div class="card-sub" id="dash-expense-count">共 0 筆</div>
       </div>
       <div class="card">
-        <div class="card-title" id="dash-balance-title">本月結餘</div>
+        <div class="card-title" id="dash-balance-title">結餘</div>
         <div class="card-value" id="dash-balance">$0</div>
         <div class="card-sub">收入 − 支出</div>
       </div>
@@ -391,6 +414,7 @@
         <div class="card-sub" id="dash-budget-sub">尚未設定預算</div>
       </div>
     </div>
+
     <div class="grid-2">
       <div class="card">
         <div class="section-header"><h2>最近交易</h2></div>
@@ -1021,8 +1045,21 @@ function changeDashOffset(d) { dashOffset+=d; renderDashboard(); }
 
 /* ── 儀表板 ── */
 function renderDashboard() {
+  // 資產快照
+  const assets  = getAssets();
+  const cashSum = assets.filter(a=>a.type==='cash').reduce((s,a)=>s+a.amount,0);
+  const invSum  = assets.filter(a=>a.type==='invest').reduce((s,a)=>s+a.amount,0);
+  document.getElementById('dash-cash').textContent   = '$'+cashSum.toLocaleString();
+  document.getElementById('dash-invest').textContent = '$'+invSum.toLocaleString();
+  document.getElementById('dash-net').textContent    = '$'+(cashSum+invSum).toLocaleString();
+  const cashItems  = assets.filter(a=>a.type==='cash').length;
+  const investItems= assets.filter(a=>a.type==='invest').length;
+  document.getElementById('dash-cash-sub').textContent  = cashItems  ? `${cashItems} 個帳戶/項目` : '尚未設定，前往資產頁面';
+  document.getElementById('dash-invest-sub').textContent= investItems ? `${investItems} 個項目` : '尚未設定，前往資產頁面';
+
+  // 期間收支
   const {start,end,label,prefix}=getDashRange();
-  document.getElementById('dash-period-label').textContent=label+' 財務總覽';
+  document.getElementById('dash-period-label').textContent='▸ '+label+' 收支';
   document.getElementById('dash-income-title').textContent=prefix+'收入';
   document.getElementById('dash-expense-title').textContent=prefix+'支出';
   document.getElementById('dash-balance-title').textContent=prefix+'結餘';
@@ -1094,14 +1131,14 @@ function addAsset() {
   const existing = state.assets.find(a=>a.name===name && a.type===type);
   if (existing) { existing.amount=amount; existing.category=category; existing.note=note; }
   else state.assets.push({ id:Date.now(), type, category, name, amount, note });
-  saveState(); renderAssets();
+  saveState(); renderAssets(); renderDashboard();
   document.getElementById('asset-name').value='';
   document.getElementById('asset-amount').value='';
   document.getElementById('asset-note').value='';
 }
 function deleteAsset(id) {
   state.assets = getAssets().filter(a=>a.id!==id);
-  saveState(); renderAssets();
+  saveState(); renderAssets(); renderDashboard();
 }
 function renderAssets() {
   const assets  = getAssets();
