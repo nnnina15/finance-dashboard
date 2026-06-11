@@ -1054,8 +1054,9 @@ function renderDashboard() {
   const assets   = getAssets();
   const cashBase = assets.filter(a=>a.type==='cash').reduce((s,a)=>s+a.amount,0);
   const invSum   = assets.filter(a=>a.type==='invest').reduce((s,a)=>s+a.amount,0);
-  // 可用現金 = 資產現金初始餘額 + 所有收支累積結餘
-  const allTx    = getTransactions();
+  // 可用現金 = 資產現金初始餘額 + 截至今日的累積收支結餘
+  const todayStr = new Date().toISOString().split('T')[0];
+  const allTx    = getTransactions().filter(t=>t.date<=todayStr);
   const allInc   = allTx.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
   const allExp   = allTx.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
   const txNet    = allInc - allExp;
