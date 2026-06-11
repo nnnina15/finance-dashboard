@@ -1210,6 +1210,7 @@ async function startApp(uid, isNew = false, displayName = '') {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.querySelector('.nav-item').classList.add('active');
   showPage('dashboard', null);
+  showLoading(false);
 }
 
 function getTransactions() { return state.transactions || []; }
