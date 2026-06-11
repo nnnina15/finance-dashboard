@@ -290,25 +290,37 @@
 
   <!-- ═══ 總覽 ═══ -->
   <div class="page active" id="page-dashboard">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
       <div>
         <div style="font-size:13px;color:var(--text-muted);margin-bottom:4px;">歡迎回來 👋</div>
-        <div class="page-title" style="margin:0;" id="dash-month-title">財務總覽</div>
+        <div class="page-title" style="margin:0;" id="dash-period-label">財務總覽</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="tabs" style="margin:0;" id="dash-period-tabs">
+          <div class="tab" onclick="setDashPeriod('day',this)">日</div>
+          <div class="tab" onclick="setDashPeriod('week',this)">週</div>
+          <div class="tab active" onclick="setDashPeriod('month',this)">月</div>
+          <div class="tab" onclick="setDashPeriod('year',this)">年</div>
+        </div>
+        <div class="month-nav">
+          <button onclick="changeDashOffset(-1)">‹</button>
+          <button onclick="changeDashOffset(1)">›</button>
+        </div>
       </div>
     </div>
     <div class="grid-4">
       <div class="card">
-        <div class="card-title">本月收入</div>
+        <div class="card-title" id="dash-income-title">本月收入</div>
         <div class="card-value" id="dash-income" style="color:var(--success)">$0</div>
         <div class="card-sub" id="dash-income-count">共 0 筆</div>
       </div>
       <div class="card">
-        <div class="card-title">本月支出</div>
+        <div class="card-title" id="dash-expense-title">本月支出</div>
         <div class="card-value" id="dash-expense" style="color:var(--danger)">$0</div>
         <div class="card-sub" id="dash-expense-count">共 0 筆</div>
       </div>
       <div class="card">
-        <div class="card-title">本月結餘</div>
+        <div class="card-title" id="dash-balance-title">本月結餘</div>
         <div class="card-value" id="dash-balance">$0</div>
         <div class="card-sub">收入 − 支出</div>
       </div>
@@ -523,6 +535,8 @@ let currentUser  = null;
 let currentMonth = new Date().getMonth();
 let currentYear  = new Date().getFullYear();
 let txFilter = 'all';
+let dashPeriod = 'month';
+let dashOffset = 0;
 let pieChart, barChart, lineChart;
 
 /* ── 帳號 ── */
@@ -833,10 +847,52 @@ function renderGoals() {
   }).join('');
 }
 
+/* ── 儀表板期間 ── */
+function getDashRange() {
+  const now=new Date();
+  let start,end,label,prefix;
+  if (dashPeriod==='day') {
+    const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()+dashOffset);
+    start=new Date(d); end=new Date(d); end.setDate(end.getDate()+1);
+    label=`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+    prefix='當日';
+  } else if (dashPeriod==='week') {
+    const base=new Date(now); base.setDate(base.getDate()+dashOffset*7);
+    start=new Date(base); start.setDate(start.getDate()-start.getDay());
+    start.setHours(0,0,0,0);
+    end=new Date(start); end.setDate(end.getDate()+7);
+    label=`${start.getFullYear()}/${start.getMonth()+1}/${start.getDate()} 週`;
+    prefix='本週';
+  } else if (dashPeriod==='month') {
+    let m=now.getMonth()+dashOffset, y=now.getFullYear();
+    while(m<0){m+=12;y--;} while(m>11){m-=12;y++;}
+    start=new Date(y,m,1); end=new Date(y,m+1,1);
+    label=`${y}年${m+1}月`;
+    prefix='本月';
+  } else {
+    const y=now.getFullYear()+dashOffset;
+    start=new Date(y,0,1); end=new Date(y+1,0,1);
+    label=`${y}年`;
+    prefix='本年';
+  }
+  return {start,end,label,prefix};
+}
+function setDashPeriod(p,el) {
+  dashPeriod=p; dashOffset=0;
+  document.querySelectorAll('#dash-period-tabs .tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  renderDashboard();
+}
+function changeDashOffset(d) { dashOffset+=d; renderDashboard(); }
+
 /* ── 儀表板 ── */
 function renderDashboard() {
-  const now=new Date(), year=now.getFullYear(), month=now.getMonth();
-  const txs=getTransactions().filter(t=>txInMonth(t,year,month));
+  const {start,end,label,prefix}=getDashRange();
+  document.getElementById('dash-period-label').textContent=label+' 財務總覽';
+  document.getElementById('dash-income-title').textContent=prefix+'收入';
+  document.getElementById('dash-expense-title').textContent=prefix+'支出';
+  document.getElementById('dash-balance-title').textContent=prefix+'結餘';
+  const txs=getTransactions().filter(t=>{ const d=new Date(t.date); return d>=start&&d<end; });
   const income=txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
   const expense=txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
   const balance=income-expense;
@@ -854,8 +910,8 @@ function renderDashboard() {
     document.getElementById('dash-budget-sub').textContent=`已用 $${expense.toLocaleString()} / $${total.toLocaleString()}`;
   }
   const recent=document.getElementById('dash-recent');
-  const last5=getTransactions().slice(0,5);
-  recent.innerHTML=!last5.length?'<div class="empty">無交易記錄</div>':last5.map(tx=>`
+  const last5=txs.slice(0,5);
+  recent.innerHTML=!last5.length?'<div class="empty">此期間無交易記錄</div>':last5.map(tx=>`
     <div class="summary-item">
       <div class="cat-icon" style="background:${tx.type==='income'?'var(--success-light)':'var(--danger-light)'};">${tx.category.split(' ')[0]}</div>
       <div class="summary-info">
