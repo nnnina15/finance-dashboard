@@ -1046,16 +1046,24 @@ function changeDashOffset(d) { dashOffset+=d; renderDashboard(); }
 /* ── 儀表板 ── */
 function renderDashboard() {
   // 資產快照
-  const assets  = getAssets();
-  const cashSum = assets.filter(a=>a.type==='cash').reduce((s,a)=>s+a.amount,0);
-  const invSum  = assets.filter(a=>a.type==='invest').reduce((s,a)=>s+a.amount,0);
-  document.getElementById('dash-cash').textContent   = '$'+cashSum.toLocaleString();
+  const assets   = getAssets();
+  const cashBase = assets.filter(a=>a.type==='cash').reduce((s,a)=>s+a.amount,0);
+  const invSum   = assets.filter(a=>a.type==='invest').reduce((s,a)=>s+a.amount,0);
+  // 可用現金 = 資產現金初始餘額 + 所有收支累積結餘
+  const allTx    = getTransactions();
+  const allInc   = allTx.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const allExp   = allTx.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const txNet    = allInc - allExp;
+  const availCash= cashBase + txNet;
+  document.getElementById('dash-cash').textContent   = '$'+availCash.toLocaleString();
   document.getElementById('dash-invest').textContent = '$'+invSum.toLocaleString();
-  document.getElementById('dash-net').textContent    = '$'+(cashSum+invSum).toLocaleString();
+  document.getElementById('dash-net').textContent    = '$'+(availCash+invSum).toLocaleString();
   const cashItems  = assets.filter(a=>a.type==='cash').length;
   const investItems= assets.filter(a=>a.type==='invest').length;
-  document.getElementById('dash-cash-sub').textContent  = cashItems  ? `${cashItems} 個帳戶/項目` : '尚未設定，前往資產頁面';
-  document.getElementById('dash-invest-sub').textContent= investItems ? `${investItems} 個項目` : '尚未設定，前往資產頁面';
+  document.getElementById('dash-cash-sub').textContent  = cashItems
+    ? `初始 $${cashBase.toLocaleString()} ${txNet>=0?'+':'-'} 收支 $${Math.abs(txNet).toLocaleString()}`
+    : '前往資產頁設定初始現金';
+  document.getElementById('dash-invest-sub').textContent= investItems ? `${investItems} 個項目` : '前往資產頁面設定';
 
   // 期間收支
   const {start,end,label,prefix}=getDashRange();
