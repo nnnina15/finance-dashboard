@@ -6,6 +6,7 @@
   <title>個人理財儀表板</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -418,7 +419,8 @@
   <div class="page active" id="page-dashboard">
     <div style="margin-bottom:6px;">
       <div style="font-size:13px;color:var(--text-muted);margin-bottom:4px;">歡迎回來 👋</div>
-      <div class="page-title" style="margin:0 0 20px;">財務總覽</div>
+      <div class="page-title" style="margin:0 0 4px;">財務總覽</div>
+      <div id="dash-today" style="font-size:13px;color:var(--text-muted);margin-bottom:20px;"></div>
     </div>
 
     <!-- 資產快照 -->
@@ -771,16 +773,14 @@ const firebaseConfig = {
   appId: "1:634574740998:web:c4e44fc0cc43f6a3226d87"
 };
 firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const db   = firebase.firestore();
+const auth = firebase.auth();
 
 function showLoading(v) { document.getElementById('loading-overlay').classList.toggle('hidden', !v); }
 
-/* ── 帳號（Firestore）── */
-async function getUser(u) {
-  const doc = await db.collection('users').doc(u).get();
-  return doc.exists ? doc.data() : null;
-}
-async function saveUser(u, data) { await db.collection('users').doc(u).set(data); }
+/* ── 帳號（Firebase Auth + Firestore）── */
+function toEmail(u) { return u.toLowerCase()+'@moneytrack.app'; }
+
 async function loadState() {
   if (!currentUser) return {};
   const doc = await db.collection('userData').doc(currentUser).get();
@@ -789,12 +789,6 @@ async function loadState() {
 function saveState() {
   if (!currentUser) return;
   db.collection('userData').doc(currentUser).set(state).catch(console.error);
-}
-
-/* ── SHA-256 ── */
-async function hashPassword(pw) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
 /* ── Auth UI ── */
@@ -814,14 +808,13 @@ async function login() {
   if (!u||!p) { e.textContent='請輸入帳號和密碼'; return; }
   showLoading(true);
   try {
-    const user = await getUser(u);
-    if (!user) { e.textContent='帳號不存在'; return; }
-    const h = await hashPassword(p);
-    if (user.hash !== h) { e.textContent='密碼錯誤'; return; }
-    sessionStorage.setItem('mt_user', u);
-    await startApp(u);
-  } catch(err) { e.textContent='連線失敗，請稍後再試'; console.error(err); }
-  finally { showLoading(false); }
+    const cred = await auth.signInWithEmailAndPassword(toEmail(u), p);
+    await startApp(cred.user.uid, false, u);
+  } catch(err) {
+    e.textContent = err.code==='auth/invalid-credential'||err.code==='auth/user-not-found'||err.code==='auth/wrong-password'
+      ? '帳號或密碼錯誤' : '連線失敗，請稍後再試';
+    console.error(err);
+  } finally { showLoading(false); }
 }
 
 async function register() {
@@ -830,22 +823,22 @@ async function register() {
   const p2 = document.getElementById('reg-pass2').value;
   const e  = document.getElementById('reg-error');
   if (!u) { e.textContent='請輸入帳號'; return; }
-  if (!/^[a-zA-Z0-9_一-鿿]+$/.test(u)) { e.textContent='帳號只能使用英數字、底線或中文'; return; }
+  if (!/^[a-zA-Z0-9_]+$/.test(u)) { e.textContent='帳號只能使用英數字和底線'; return; }
   if (p.length < 6) { e.textContent='密碼至少需要 6 個字元'; return; }
   if (p !== p2) { e.textContent='兩次密碼不一致'; return; }
   showLoading(true);
   try {
-    const existing = await getUser(u);
-    if (existing) { e.textContent='此帳號已被使用'; return; }
-    await saveUser(u, { hash: await hashPassword(p) });
-    sessionStorage.setItem('mt_user', u);
-    await startApp(u, true);
-  } catch(err) { e.textContent='連線失敗，請稍後再試'; console.error(err); }
-  finally { showLoading(false); }
+    const cred = await auth.createUserWithEmailAndPassword(toEmail(u), p);
+    await cred.user.updateProfile({ displayName: u });
+    await startApp(cred.user.uid, true, u);
+  } catch(err) {
+    e.textContent = err.code==='auth/email-already-in-use' ? '此帳號已被使用' : '連線失敗，請稍後再試';
+    console.error(err);
+  } finally { showLoading(false); }
 }
 
 function logout() {
-  sessionStorage.removeItem('mt_user');
+  auth.signOut();
   currentUser = null; state = {};
   document.querySelector('.sidebar').style.display = 'none';
   document.querySelector('.main').style.display    = 'none';
@@ -856,8 +849,9 @@ function logout() {
   switchAuthTab('login');
 }
 
-async function startApp(username, isNew = false) {
-  currentUser = username;
+async function startApp(uid, isNew = false, displayName = '') {
+  currentUser = uid;
+  const username = displayName || auth.currentUser?.displayName || uid.slice(0,8);
   state       = await loadState();
 
   if (isNew && !state.transactions) {
@@ -930,20 +924,19 @@ function showPage(id, el) {
 }
 
 /* ── 初始化 ── */
-window.addEventListener('DOMContentLoaded', async () => {
+window.addEventListener('DOMContentLoaded', () => {
   document.querySelector('.sidebar').style.display = 'none';
   document.querySelector('.main').style.display    = 'none';
   document.getElementById('auth-screen').classList.add('show');
-  const saved = sessionStorage.getItem('mt_user');
-  if (saved) {
-    showLoading(true);
-    try {
-      const user = await getUser(saved);
-      if (user) { await startApp(saved); return; }
-      sessionStorage.removeItem('mt_user');
-    } catch(err) { console.error(err); }
-    finally { showLoading(false); }
-  }
+  showLoading(true);
+  auth.onAuthStateChanged(async user => {
+    if (user) {
+      try { await startApp(user.uid, false, user.displayName || ''); }
+      catch(err) { console.error(err); showLoading(false); }
+    } else {
+      showLoading(false);
+    }
+  });
 });
 
 function populateCategorySelect() {
@@ -1145,6 +1138,12 @@ function changeDashOffset(d) { dashOffset+=d; renderDashboard(); }
 
 /* ── 儀表板 ── */
 function renderDashboard() {
+  // 今日日期
+  const now0=new Date();
+  const weekDayNames=['日','一','二','三','四','五','六'];
+  document.getElementById('dash-today').textContent=
+    `${now0.getFullYear()} 年 ${now0.getMonth()+1} 月 ${now0.getDate()} 日　星期${weekDayNames[now0.getDay()]}`;
+
   // 資產快照
   const assets   = getAssets();
   const cashBase = assets.filter(a=>a.type==='cash').reduce((s,a)=>s+a.amount,0);
