@@ -351,6 +351,58 @@
   </div>
 </div>
 
+<!-- 定期收支編輯 Modal -->
+<div class="modal-overlay" id="edit-recur-modal" onclick="closeRecurModal(event)">
+  <div class="modal">
+    <div class="modal-title">✏️ 編輯定期收支</div>
+    <input type="hidden" id="er-id" />
+    <div class="form-row">
+      <div>
+        <label>類型</label>
+        <select id="er-type" onchange="updateErCategories()">
+          <option value="expense">支出</option>
+          <option value="income">收入</option>
+        </select>
+      </div>
+      <div>
+        <label>金額 (NT$)</label>
+        <input type="number" id="er-amount" min="0" />
+      </div>
+      <div>
+        <label>類別</label>
+        <select id="er-category"></select>
+      </div>
+      <div>
+        <label>週期</label>
+        <select id="er-freq" onchange="updateErDayUI()">
+          <option value="monthly">每月固定</option>
+          <option value="weekly">每週固定</option>
+          <option value="every2months">每隔2個月</option>
+          <option value="every3months">每隔3個月</option>
+          <option value="every4months">每隔4個月</option>
+          <option value="yearly">每年固定</option>
+        </select>
+      </div>
+      <div id="er-month-wrap" style="display:none;">
+        <label id="er-month-label">起始月份</label>
+        <select id="er-month"></select>
+      </div>
+      <div>
+        <label id="er-day-label">每月幾號</label>
+        <select id="er-day"></select>
+      </div>
+      <div style="grid-column:span 2">
+        <label>名稱/備註</label>
+        <input type="text" id="er-note" />
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="document.getElementById('edit-recur-modal').classList.remove('open')">取消</button>
+      <button class="btn btn-primary" onclick="saveEditRecurring()">儲存</button>
+    </div>
+  </div>
+</div>
+
 <!-- 主要內容 -->
 <main class="main">
 
@@ -1317,6 +1369,77 @@ function addRecurring() {
   document.getElementById('rec-note').value='';
 }
 function deleteRecurring(id) { state.recurring=getRecurring().filter(r=>r.id!==id); saveState(); renderRecurring(); }
+function updateErCategories() {
+  const sel=document.getElementById('er-category');
+  const cur=sel.value;
+  sel.innerHTML=CATEGORIES[document.getElementById('er-type').value].map(c=>`<option value="${c}">${c}</option>`).join('');
+  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+}
+function updateErDayUI() {
+  const freq=document.getElementById('er-freq').value;
+  const dayLabel=document.getElementById('er-day-label');
+  const daySel=document.getElementById('er-day');
+  const monthWrap=document.getElementById('er-month-wrap');
+  const monthLabel=document.getElementById('er-month-label');
+  const monthSel=document.getElementById('er-month');
+  if (freq==='weekly') {
+    dayLabel.textContent='每週幾';
+    daySel.innerHTML=WEEKDAYS.map((d,i)=>`<option value="${i}">${d}</option>`).join('');
+    monthWrap.style.display='none';
+  } else if (freq==='yearly') {
+    dayLabel.textContent='幾號';
+    daySel.innerHTML=Array.from({length:31},(_,i)=>`<option value="${i+1}">${i+1} 號</option>`).join('');
+    monthLabel.textContent='幾月';
+    monthSel.innerHTML=MONTHS_TW.map((m,i)=>`<option value="${i}">${m}</option>`).join('');
+    monthWrap.style.display='';
+  } else if (['every2months','every3months','every4months'].includes(freq)) {
+    dayLabel.textContent='幾號';
+    daySel.innerHTML=Array.from({length:31},(_,i)=>`<option value="${i+1}">${i+1} 號</option>`).join('');
+    monthLabel.textContent='起始月份';
+    monthSel.innerHTML=MONTHS_TW.map((m,i)=>`<option value="${i}">${m}</option>`).join('');
+    monthWrap.style.display='';
+  } else {
+    dayLabel.textContent='每月幾號';
+    daySel.innerHTML=Array.from({length:31},(_,i)=>`<option value="${i+1}">${i+1} 號</option>`).join('');
+    monthWrap.style.display='none';
+  }
+}
+function openEditRecurring(id) {
+  const r=getRecurring().find(r=>r.id===id);
+  if (!r) return;
+  document.getElementById('er-id').value=id;
+  document.getElementById('er-type').value=r.type;
+  updateErCategories();
+  document.getElementById('er-category').value=r.category;
+  document.getElementById('er-freq').value=r.freq;
+  updateErDayUI();
+  document.getElementById('er-day').value=r.day;
+  if (r.startMonth!=null) document.getElementById('er-month').value=r.startMonth;
+  document.getElementById('er-amount').value=r.amount;
+  document.getElementById('er-note').value=r.note||'';
+  document.getElementById('edit-recur-modal').classList.add('open');
+}
+function saveEditRecurring() {
+  const id=parseInt(document.getElementById('er-id').value);
+  const r=getRecurring().find(r=>r.id===id);
+  if (!r) return;
+  r.type    =document.getElementById('er-type').value;
+  r.category=document.getElementById('er-category').value;
+  r.freq    =document.getElementById('er-freq').value;
+  r.day     =parseInt(document.getElementById('er-day').value);
+  r.note    =document.getElementById('er-note').value.trim();
+  r.amount  =parseFloat(document.getElementById('er-amount').value);
+  const mw=document.getElementById('er-month-wrap');
+  if (mw.style.display!=='none') r.startMonth=parseInt(document.getElementById('er-month').value);
+  if (!r.amount||r.amount<=0) return alert('請輸入有效金額');
+  saveState();
+  document.getElementById('edit-recur-modal').classList.remove('open');
+  renderRecurring();
+}
+function closeRecurModal(e) {
+  if (e.target===document.getElementById('edit-recur-modal'))
+    document.getElementById('edit-recur-modal').classList.remove('open');
+}
 function renderRecurring() {
   const rules=getRecurring(), el=document.getElementById('recur-list');
   if (!el) return;
@@ -1339,6 +1462,7 @@ function renderRecurring() {
         <div class="recur-freq">${r.category.split(' ').slice(1).join(' ')} · ${fl}</div>
       </div>
       <span class="recur-badge" style="background:${bgCol};color:${color};">${sign}$${r.amount.toLocaleString()}</span>
+      <button class="icon-btn edit" onclick="openEditRecurring(${r.id})" title="編輯"><svg viewBox="0 0 24 24" fill="none" width="100%" height="100%"><path d="M18 10L14 6M2.49997 21.5L5.88434 21.124C6.29783 21.078 6.50457 21.055 6.69782 20.9925C6.86926 20.937 7.03242 20.8586 7.18286 20.7594C7.35242 20.6475 7.49951 20.5005 7.7937 20.2063L21 7C22.1046 5.89543 22.1046 4.10457 21 3C19.8954 1.89543 18.1046 1.89543 17 3L3.7937 16.2063C3.49952 16.5005 3.35242 16.6475 3.24061 16.8171C3.1414 16.9676 3.06298 17.1307 3.00748 17.3022C2.94493 17.4954 2.92195 17.7021 2.87601 18.1156L2.49997 21.5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <button class="icon-btn del" onclick="deleteRecurring(${r.id})" title="刪除"><svg viewBox="0 0 24 24" fill="none" width="100%" height="100%"><path d="M17 7L7 17M7 7L17 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>`;
   }).join('');
