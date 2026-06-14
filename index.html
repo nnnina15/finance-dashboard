@@ -547,6 +547,16 @@
         <label>備註</label>
         <input type="text" id="edit-note" placeholder="選填" />
       </div>
+      <div style="grid-column:span 2">
+        <label>商家（選填）</label>
+        <input type="text" id="edit-merchant" placeholder="例：全家、Netflix…" autocomplete="off"
+               oninput="filterEditMerchantSuggestions(this.value)" />
+        <div id="edit-merchant-recent" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+      </div>
+      <div style="grid-column:span 2">
+        <label>付款方式</label>
+        <div class="pay-chips" id="edit-pay-chips"></div>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn-outline" onclick="document.getElementById('edit-modal').classList.remove('open')">取消</button>
@@ -1044,6 +1054,7 @@ let chartYear  = new Date().getFullYear();
 
 // Transaction form state
 let selectedPayMethod = '';
+let editPayMethod = '';
 
 const PAYMENT_METHODS = [
   {name:'現金',cashback:0}, {name:'悠遊卡',cashback:0},
@@ -1988,7 +1999,44 @@ function openEdit(id) {
   document.getElementById('edit-amount').value=tx.amount;
   document.getElementById('edit-date').value=tx.date;
   document.getElementById('edit-note').value=tx.note||'';
+  document.getElementById('edit-merchant').value=tx.merchant||'';
+
+  // 近期商家建議（最多8個唯一商家）
+  const allMerchants=[...new Set(
+    getTransactions().map(t=>t.merchant).filter(Boolean)
+  )].slice(0,8);
+  const recEl=document.getElementById('edit-merchant-recent');
+  recEl.innerHTML=allMerchants.map(m=>
+    `<span onclick="document.getElementById('edit-merchant').value='${m.replace(/'/g,"\\'")}'"
+      style="padding:3px 10px;border-radius:12px;font-size:12px;cursor:pointer;
+             background:rgba(155,140,255,.12);border:1px solid rgba(155,140,255,.25);
+             color:var(--text-muted);">${m}</span>`
+  ).join('');
+
+  // 付款方式 chips
+  editPayMethod = tx.paymentMethod||'';
+  const chipEl=document.getElementById('edit-pay-chips');
+  chipEl.innerHTML=PAYMENT_METHODS.map(p=>
+    `<div class="pay-chip${editPayMethod===p.name?' active':''}"
+      onclick="selectEditPay('${p.name}',this)">${p.name}</div>`
+  ).join('');
+
   document.getElementById('edit-modal').classList.add('open');
+}
+function selectEditPay(name, el) {
+  editPayMethod = editPayMethod===name ? '' : name;
+  document.querySelectorAll('#edit-pay-chips .pay-chip').forEach(c=>c.classList.remove('active'));
+  if (editPayMethod) el.classList.add('active');
+}
+function filterEditMerchantSuggestions(val) {
+  const all=[...new Set(getTransactions().map(t=>t.merchant).filter(Boolean))];
+  const filtered = val ? all.filter(m=>m.includes(val)).slice(0,8) : all.slice(0,8);
+  document.getElementById('edit-merchant-recent').innerHTML=filtered.map(m=>
+    `<span onclick="document.getElementById('edit-merchant').value='${m.replace(/'/g,"\\'")}'"
+      style="padding:3px 10px;border-radius:12px;font-size:12px;cursor:pointer;
+             background:rgba(155,140,255,.12);border:1px solid rgba(155,140,255,.25);
+             color:var(--text-muted);">${m}</span>`
+  ).join('');
 }
 function saveEdit() {
   const id=parseInt(document.getElementById('edit-id').value);
@@ -2001,7 +2049,10 @@ function saveEdit() {
   if (!date) return alert('請選擇日期');
   const tx=getTransactions().find(t=>t.id===id);
   if (!tx) return;
+  const merchant=(document.getElementById('edit-merchant').value||'').trim();
   Object.assign(tx,{type,amount,category,date,note});
+  if (merchant) tx.merchant=merchant; else delete tx.merchant;
+  if (editPayMethod) tx.paymentMethod=editPayMethod; else delete tx.paymentMethod;
   saveState();
   document.getElementById('edit-modal').classList.remove('open');
   renderTransactions(); renderDashboard();
