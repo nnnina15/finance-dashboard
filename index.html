@@ -486,7 +486,7 @@
     </div>
   </nav>
   <div id="user-chip-area"></div>
-  <div class="sidebar-footer">MoneyTrack v1.0</div>
+  <div class="sidebar-footer">MoneyTrack v1.1</div>
 </aside>
 
 <!-- 登入 / 註冊畫面 -->
@@ -712,9 +712,15 @@
     <!-- 新增一筆 + 定期收支 合併卡片 -->
     <div class="card" style="margin-bottom:20px;">
       <!-- 分頁 tabs -->
-      <div class="tabs" style="margin:-22px -22px 20px;border-radius:20px 20px 0 0;overflow:hidden;padding:4px 4px 0;">
-        <div class="tab active" id="add-tab-single" onclick="switchAddTab('single',this)">✏️ 新增一筆</div>
-        <div class="tab" id="add-tab-recur" onclick="switchAddTab('recur',this)">🔄 定期收支</div>
+      <div style="display:flex;margin:-22px -22px 20px;border-bottom:1px solid var(--border);border-radius:20px 20px 0 0;overflow:hidden;">
+        <div id="add-tab-single" onclick="switchAddTab('single')"
+          style="flex:1;padding:14px 0;text-align:center;font-size:14px;font-weight:600;cursor:pointer;
+                 color:var(--primary);border-bottom:2px solid var(--primary);
+                 background:var(--primary-light);transition:all .2s;">✏️ 新增一筆</div>
+        <div id="add-tab-recur" onclick="switchAddTab('recur')"
+          style="flex:1;padding:14px 0;text-align:center;font-size:14px;font-weight:500;cursor:pointer;
+                 color:var(--text-muted);border-bottom:2px solid transparent;
+                 background:none;transition:all .2s;">🔄 定期收支</div>
       </div>
 
       <!-- ── 新增一筆 panel ── -->
@@ -2027,10 +2033,15 @@ function selectCatIcon(btn, val) {
 }
 function switchAddTab(tab) {
   const panels = { single: 'add-panel-single', recur: 'add-panel-recur' };
-  const tabs   = { single: 'add-tab-single',  recur: 'add-tab-recur'  };
+  const tabs   = { single: 'add-tab-single',   recur: 'add-tab-recur'  };
   Object.keys(panels).forEach(k => {
-    document.getElementById(panels[k]).style.display = k === tab ? '' : 'none';
-    document.getElementById(tabs[k]).classList.toggle('active', k === tab);
+    const isActive = k === tab;
+    document.getElementById(panels[k]).style.display = isActive ? '' : 'none';
+    const el = document.getElementById(tabs[k]);
+    el.style.color          = isActive ? 'var(--primary)' : 'var(--text-muted)';
+    el.style.borderBottom   = isActive ? '2px solid var(--primary)' : '2px solid transparent';
+    el.style.background     = isActive ? 'var(--primary-light)' : 'none';
+    el.style.fontWeight     = isActive ? '600' : '500';
   });
   if (tab === 'recur') renderRecurList();
 }
