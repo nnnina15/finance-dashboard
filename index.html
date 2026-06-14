@@ -709,59 +709,51 @@
   <div class="page" id="page-transactions">
     <div class="page-title">收支記帳</div>
 
+    <!-- 新增一筆 + 定期收支 合併卡片 -->
     <div class="card" style="margin-bottom:20px;">
-      <div class="section-header"><h2>新增一筆</h2></div>
-
-      <!-- 類型 tabs -->
-      <div class="tx-type-tabs">
-        <button class="tx-type-tab active" id="tx-type-tab-expense" onclick="setTxType('expense')">💸 支出</button>
-        <button class="tx-type-tab" id="tx-type-tab-income" onclick="setTxType('income')">💰 收入</button>
-      </div>
-      <!-- hidden selects (read by addTransaction) -->
-      <select id="tx-type" style="display:none;"><option value="expense">支出</option><option value="income">收入</option></select>
-      <select id="tx-category" style="display:none;"></select>
-
-      <!-- 類別 icon 格 -->
-      <label>類別</label>
-      <div class="cat-grid" id="tx-cat-grid"></div>
-
-      <!-- 金額 / 日期 / 商家 / 備註 -->
-      <div class="form-row">
-        <div>
-          <label>金額 (NT$)</label>
-          <input type="number" id="tx-amount" placeholder="0" min="0" />
-        </div>
-        <div>
-          <label>日期</label>
-          <input type="date" id="tx-date" />
-        </div>
-        <div>
-          <label>商家（選填）</label>
-          <input type="text" id="tx-merchant" placeholder="例：全家、Netflix…" />
-        </div>
-        <div>
-          <label>備註（選填）</label>
-          <input type="text" id="tx-note" placeholder="例：午餐、薪資…" />
-        </div>
+      <!-- 分頁 tabs -->
+      <div class="tabs" style="margin:-22px -22px 20px;border-radius:20px 20px 0 0;overflow:hidden;padding:4px 4px 0;">
+        <div class="tab active" id="add-tab-single" onclick="switchAddTab('single',this)">✏️ 新增一筆</div>
+        <div class="tab" id="add-tab-recur" onclick="switchAddTab('recur',this)">🔄 定期收支</div>
       </div>
 
-      <!-- 付款方式 -->
-      <label>付款方式</label>
-      <div class="pay-chips" id="pay-chips"></div>
-      <div class="cashback-hint" id="cashback-hint" style="display:none;"></div>
-
-      <button class="btn btn-primary" style="margin-top:16px;" onclick="addTransaction()">＋ 新增</button>
-    </div>
-
-    <!-- 定期收支 -->
-    <div class="card" style="margin-bottom:20px;">
-      <div class="recur-section-header">
-        <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M17 1L21 5M21 5L17 9M21 5H7C5.93913 5 4.92172 5.42143 4.17157 6.17157C3.42143 6.92172 3 7.93913 3 9V11M7 23L3 19M3 19L7 15M3 19H17C18.0609 19 19.0783 18.5786 19.8284 17.8284C20.5786 17.0783 21 16.0609 21 15V13" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <h2>定期收支設定</h2>
-        <span class="recur-section-tag" id="recur-count-tag">自動記帳</span>
+      <!-- ── 新增一筆 panel ── -->
+      <div id="add-panel-single">
+        <div class="tx-type-tabs">
+          <button class="tx-type-tab active" id="tx-type-tab-expense" onclick="setTxType('expense')">💸 支出</button>
+          <button class="tx-type-tab" id="tx-type-tab-income" onclick="setTxType('income')">💰 收入</button>
+        </div>
+        <select id="tx-type" style="display:none;"><option value="expense">支出</option><option value="income">收入</option></select>
+        <select id="tx-category" style="display:none;"></select>
+        <label>類別</label>
+        <div class="cat-grid" id="tx-cat-grid"></div>
+        <div class="form-row">
+          <div>
+            <label>金額 (NT$)</label>
+            <input type="number" id="tx-amount" placeholder="0" min="0" />
+          </div>
+          <div>
+            <label>日期</label>
+            <input type="date" id="tx-date" />
+          </div>
+          <div>
+            <label>商家（選填）</label>
+            <input type="text" id="tx-merchant" placeholder="例：全家、Netflix…" />
+          </div>
+          <div>
+            <label>備註（選填）</label>
+            <input type="text" id="tx-note" placeholder="例：午餐、薪資…" />
+          </div>
+        </div>
+        <label>付款方式</label>
+        <div class="pay-chips" id="pay-chips"></div>
+        <div class="cashback-hint" id="cashback-hint" style="display:none;"></div>
+        <button class="btn btn-primary" style="margin-top:16px;" onclick="addTransaction()">＋ 新增</button>
       </div>
-      <div id="recur-summary" style="margin-bottom:14px;"></div>
-      <div id="recur-panel">
+
+      <!-- ── 定期收支 panel ── -->
+      <div id="add-panel-recur" style="display:none;">
+        <div id="recur-summary" style="margin-bottom:14px;"></div>
         <div class="form-row" style="margin-bottom:12px;">
           <div>
             <label>類型</label>
@@ -2033,6 +2025,16 @@ function selectCatIcon(btn, val) {
   const sel = document.getElementById('tx-category');
   if (sel) sel.value = val;
 }
+function switchAddTab(tab) {
+  const panels = { single: 'add-panel-single', recur: 'add-panel-recur' };
+  const tabs   = { single: 'add-tab-single',  recur: 'add-tab-recur'  };
+  Object.keys(panels).forEach(k => {
+    document.getElementById(panels[k]).style.display = k === tab ? '' : 'none';
+    document.getElementById(tabs[k]).classList.toggle('active', k === tab);
+  });
+  if (tab === 'recur') renderRecurList();
+}
+
 function setTxType(type) {
   document.getElementById('tx-type').value = type;
   document.querySelectorAll('.tx-type-tab').forEach(t=>t.classList.remove('active'));
